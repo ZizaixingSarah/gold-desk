@@ -1,7 +1,7 @@
 import http from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "public");
@@ -601,7 +601,7 @@ async function serveStatic(req, res) {
   }
 }
 
-const server = http.createServer(async (req, res) => {
+export async function handleRequest(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
     if (url.pathname === "/healthz") {
@@ -624,9 +624,13 @@ const server = http.createServer(async (req, res) => {
   } catch (error) {
     sendJson(res, 500, { error: error.message || String(error) });
   }
-});
+}
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+export default handleRequest;
+
+const server = http.createServer(handleRequest);
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   server.listen(port, () => {
     console.log(`Gold Price Logic Desk running at http://localhost:${port}`);
   });
