@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>黄金价格逻辑分析台</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">Gold Price Logic Desk</p>
+          <h1>黄金价格逻辑分析台</h1>
+        </div>
+        <div class="actions">
+          <button id="refreshBtn" title="刷新数据">刷新</button>
+          <label class="toggle">
+            <input id="autoRefresh" type="checkbox" checked />
+            <span>自动</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="grid summary-grid">
+        <article class="metric primary">
+          <span>黄金价格</span>
+          <strong id="goldPrice">--</strong>
+          <small id="goldMeta">等待数据</small>
+        </article>
+        <article class="metric">
+          <span>10年实际利率</span>
+          <strong id="realYield">--</strong>
+          <small id="realYieldTrend">--</small>
+        </article>
+        <article class="metric">
+          <span>美元指数</span>
+          <strong id="dxy">--</strong>
+          <small id="dxyTrend">--</small>
+        </article>
+        <article class="metric">
+          <span>交易评分</span>
+          <strong id="score">--</strong>
+          <small id="scoreLabel">--</small>
+        </article>
+      </section>
+
+      <section class="principles">
+        <article>
+          <span>机会成本</span>
+          <strong id="costScore">--</strong>
+          <small>实际利率决定持有无息资产的代价</small>
+        </article>
+        <article>
+          <span>货币信用</span>
+          <strong id="moneyScore">--</strong>
+          <small>美元强弱与通胀预期决定法币替代需求</small>
+        </article>
+        <article>
+          <span>保险价值</span>
+          <strong id="insuranceScore">--</strong>
+          <small>风险冲击提升黄金的尾部保护价值</small>
+        </article>
+        <article>
+          <span>边际买盘</span>
+          <strong id="flowScore">--</strong>
+          <small>趋势、突破和仓位决定入场时机</small>
+        </article>
+      </section>
+
+      <section class="workspace">
+        <aside class="panel controls">
+          <h2>账户参数</h2>
+          <label>
+            账户权益 USD
+            <input id="equity" type="number" value="10000" min="100" step="100" />
+          </label>
+          <label>
+            单笔风险 %
+            <input id="riskPct" type="number" value="1.5" min="0.1" max="5" step="0.1" />
+          </label>
+          <label>
+            计划杠杆
+            <input id="leverage" type="range" min="2" max="5" step="0.5" value="2.5" />
+            <output id="leverageOut">2.5x</output>
+          </label>
+          <label>
+            持仓周期
+            <select id="horizon">
+              <option value="swing">20-60天</option>
+              <option value="position" selected>2-5个月</option>
+            </select>
+          </label>
+          <label>
+            手动黄金价
+            <input id="manualGold" type="number" min="1" step="0.1" placeholder="留空用实时价" />
+          </label>
+        </aside>
+
+        <section class="panel chart-panel">
+          <div class="panel-head">
+            <h2>价格与宏观变量</h2>
+            <select id="chartMode">
+              <option value="gold">黄金</option>
+              <option value="real10y">10年实际利率</option>
+              <option value="dxy">美元指数</option>
+              <option value="nominal10y">10年名义利率</option>
+              <option value="vix">VIX</option>
+            </select>
+          </div>
+          <canvas id="mainChart" width="960" height="380"></canvas>
+        </section>
+
+        <section class="panel signal-panel">
+          <h2>分析与操作</h2>
+          <div id="decision" class="decision">读取中</div>
+          <div class="plan">
+            <div>
+              <span>建议方向</span>
+              <strong id="direction">--</strong>
+            </div>
+            <div>
+              <span>建议仓位</span>
+              <strong id="position">--</strong>
+            </div>
+            <div>
+              <span>止损</span>
+              <strong id="stopLoss">--</strong>
+            </div>
+            <div>
+              <span>目标区</span>
+              <strong id="target">--</strong>
+            </div>
+          </div>
+          <ul id="drivers" class="drivers"></ul>
+        </section>
+      </section>
+
+      <section class="panel audit-panel">
+        <div class="panel-head">
+          <div>
+            <h2>60年回测与对抗检查</h2>
+            <small id="auditMeta">等待历史数据</small>
+          </div>
+          <button id="backtestBtn" title="重新运行回测">重测</button>
+        </div>
+        <section class="audit-grid">
+          <article>
+            <span>模型CAGR</span>
+            <strong id="btCagr">--</strong>
+          </article>
+          <article>
+            <span>最大回撤</span>
+            <strong id="btDrawdown">--</strong>
+          </article>
+          <article>
+            <span>交易次数/胜率</span>
+            <strong id="btTrades">--</strong>
+          </article>
+          <article>
+            <span>买入持有收益</span>
+            <strong id="btBuyHold">--</strong>
+          </article>
+        </section>
+        <canvas id="backtestChart" width="960" height="260"></canvas>
+        <div class="audit-columns">
+          <div>
+            <h3>对抗性反例</h3>
+            <ul id="auditAlerts" class="drivers"></ul>
+          </div>
+          <div>
+            <h3>历史阶段</h3>
+            <div id="regimeRows" class="regime-rows"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel table-panel">
+        <div class="panel-head">
+          <h2>数据状态</h2>
+          <span id="updatedAt">--</span>
+        </div>
+        <div id="statusRows" class="status-rows"></div>
+      </section>
+
+      <p class="disclaimer">
+        仅用于研究和展示，不构成投资建议。数据可能延迟或中断，杠杆交易会放大亏损，请独立复核。
+      </p>
+    </main>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
