@@ -35,9 +35,9 @@ async function cachedFor(key, ttlMs, loader) {
   return value;
 }
 
-async function fetchText(url) {
+async function fetchText(url, timeoutMs = 25000) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, {
       signal: controller.signal,
@@ -126,7 +126,7 @@ async function yahooSeries(symbol, range = "2y", transform) {
 
 async function fredSeries(id) {
   const url = `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${encodeURIComponent(id)}`;
-  return parseFredCsv(await fetchText(url), id);
+  return parseFredCsv(await fetchText(url, 30000), id);
 }
 
 async function fredSeriesLong(id) {
@@ -169,6 +169,56 @@ function parseBullionVaultCsv(csv) {
 async function bullionVaultGoldSeries() {
   const url = "https://chart-data.bullionvault.com/prices/CSV/AUX/USD/172800/Full";
   return parseBullionVaultCsv(await fetchText(url));
+}
+
+async function dxySeries() {
+  try {
+    return await syntheticDxySeries();
+  } catch {
+    const fallback = await fredSeries("DTWEXBGS");
+    return fallback.map((point) => ({ ...point, source: "FRED:DTWEXBGS (Broad USD fallback)" }));
+  }
+}
+
+async function syntheticDxySeries() {
+  const end = new Date().toISOString().slice(0, 10);
+  const startDate = new Date();
+  startDate.setFullYear(startDate.getFullYear() - 2);
+  const start = startDate.toISOString().slice(0, 10);
+  const url = `https://api.frankfurter.app/${start}..${end}?from=USD&to=EUR,JPY,GBP,CAD,SEK,CHF`;
+  const json = JSON.parse(await fetchText(url, 25000));
+  return Object.entries(json.rates || {})
+    .map(([date, r]) => {
+      const value =
+        50.14348112 *
+        Math.pow(r.EUR, 0.576) *
+        Math.pow(r.JPY, 0.136) *
+        Math.pow(r.GBP, 0.119) *
+        Math.pow(r.CAD, 0.091) *
+        Math.pow(r.SEK, 0.042) *
+        Math.pow(r.CHF, 0.036);
+      return { date, value, source: "Frankfurter/ECB synthetic DXY basket" };
+    })
+    .filter((point) => Number.isFinite(point.value))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function nominal10ySeries() {
+  try {
+    const series = await yahooSeries("^TNX", "2y", (value) => value / 10);
+    return series.map((point) => ({ ...point, source: "Yahoo:^TNX" }));
+  } catch {
+    return fredSeries("DGS10");
+  }
+}
+
+async function vixSeries() {
+  try {
+    const series = await yahooSeries("^VIX", "2y");
+    return series.map((point) => ({ ...point, source: "Yahoo:^VIX" }));
+  } catch {
+    return fredSeries("VIXCLS");
+  }
 }
 
 async function worldBankGoldMonthly() {
@@ -525,11 +575,11 @@ export async function getBacktestPayload(force = false) {
 async function loadDashboard() {
   const tasks = {
     gold: () => bullionVaultGoldSeries(),
-    dxy: () => fredSeries("DTWEXBGS"),
-    nominal10y: () => fredSeries("DGS10"),
-    vix: () => fredSeries("VIXCLS"),
-    real10y: () => fredSeries("DFII10"),
-    breakeven10y: () => fredSeries("T10YIE")
+    dxy: () => dxySeries(),
+    nominal10y: () => nominal10ySeries(),
+    vix: () => vixSeries(),
+    real10y: () => withRetry("FRED DFII10", () => fredSeries("DFII10"), 2),
+    breakeven10y: () => withRetry("FRED T10YIE", () => fredSeries("T10YIE"), 2)
   };
 
   const settled = await Promise.allSettled(
