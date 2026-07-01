@@ -508,6 +508,20 @@ function latest(series) {
   return series?.at(-1) || null;
 }
 
+export function healthPayload() {
+  return { ok: true, service: "gold-price-logic-desk", asOf: new Date().toISOString() };
+}
+
+export async function getDashboardPayload(force = false) {
+  if (force) cache.delete("dashboard");
+  return cached("dashboard", loadDashboard);
+}
+
+export async function getBacktestPayload(force = false) {
+  if (force) cache.delete("backtest");
+  return cachedFor("backtest", LONG_TTL_MS, loadBacktest);
+}
+
 async function loadDashboard() {
   const tasks = {
     gold: () => bullionVaultGoldSeries(),
@@ -591,20 +605,18 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
     if (url.pathname === "/healthz") {
-      sendJson(res, 200, { ok: true, service: "gold-price-logic-desk", asOf: new Date().toISOString() });
+      sendJson(res, 200, healthPayload());
       return;
     }
     if (url.pathname === "/api/market") {
       const force = url.searchParams.get("force") === "1";
-      if (force) cache.delete("dashboard");
-      const payload = await cached("dashboard", loadDashboard);
+      const payload = await getDashboardPayload(force);
       sendJson(res, 200, payload);
       return;
     }
     if (url.pathname === "/api/backtest") {
       const force = url.searchParams.get("force") === "1";
-      if (force) cache.delete("backtest");
-      const payload = await cachedFor("backtest", LONG_TTL_MS, loadBacktest);
+      const payload = await getBacktestPayload(force);
       sendJson(res, 200, payload);
       return;
     }
@@ -614,6 +626,8 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, () => {
-  console.log(`Gold Macro Desk running at http://localhost:${port}`);
-});
+if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+  server.listen(port, () => {
+    console.log(`Gold Price Logic Desk running at http://localhost:${port}`);
+  });
+}
